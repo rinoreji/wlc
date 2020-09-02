@@ -26,7 +26,13 @@ var tankChart = new Chart(tank, {
                 ticks: {
                     max: TANK_EMPTY,
                     min: TANK_FULL,
-                    display: false
+                    callback: function (value, index, values) {
+                        if (value == TANK_FULL)
+                            return 'Empty';
+                        if (value == TANK_EMPTY)
+                            return 'Full';
+                        return '';
+                    }
                 }
             }],
         }
@@ -59,6 +65,11 @@ var chart = new Chart(ctx, {
             xAxes: [{
                 type: 'time'
             }]
+        },
+        elements: {
+            point: {
+                radius: 0
+            }
         }
     }
 });
