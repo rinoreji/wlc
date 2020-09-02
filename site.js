@@ -58,8 +58,11 @@ var chart = new Chart(ctx, {
         scales: {
             yAxes: [{
                 ticks: {
-                    stepSize: 5,
-                    reverse: false
+                    max: TANK_EMPTY,
+                    min: TANK_FULL,
+                    callback: function (value) {
+                        return (value / TANK_EMPTY * 100).toFixed(0) + '%';
+                    }
                 }
             }],
             xAxes: [{
@@ -79,7 +82,7 @@ var chart = new Chart(ctx, {
 function updateChart() {
 
     chart.data.labels = $.map(sensorData, function (n, i) { return n.timestamp });
-    chart.data.datasets[0].data = $.map(sensorData, function (n, i) { return n.value });
+    chart.data.datasets[0].data = $.map(sensorData, function (n, i) { return TANK_EMPTY - n.value });
     chart.update();
 
     tankChart.data.labels = ['Water level as of: ' + new Date(latestData.timestamp).toLocaleTimeString()];
