@@ -26,7 +26,7 @@ var tankChart = new Chart(tank, {
                 ticks: {
                     max: TANK_EMPTY,
                     min: TANK_FULL,
-                    callback: function (value, index, values) {
+                    callback: function (value) {
                         if (value == TANK_FULL)
                             return 'Empty';
                         if (value == TANK_EMPTY)
@@ -100,19 +100,32 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 var database = firebase.database();
 var initFetch = false;
+
+// window.db = database;
+// var test = database.ref('sensor-data').orderByChild('timestamp').startAt(1599136200000).endAt(1599138000000);
+// test.once('value', function (snapshot) {
+//     snapshot.forEach(function (item) {
+// console.log(item.key, item.val());
+// // database.ref('sensor-data/'+item.key).remove();
+//     });
+// });
+
 var sensorDataRef = database.ref('sensor-data').orderByChild('timestamp').limitToLast(500);
 sensorDataRef.on('child_changed', function (snap) {
     if (!initFetch) return;
     latestData = convertToChartData(snap);
-    sensorData.push(latestData);
-    updateChart();
+    if (latestData != null) {
+        sensorData.push(latestData);
+        updateChart();
+    }
 });
 sensorDataRef.once('value', function (snapshot) {
     initFetch = true;
     sensorData = [];
     snapshot.forEach(function (item) {
         latestData = convertToChartData(item);
-        sensorData.push(latestData);
+        if (latestData != null)
+            sensorData.push(latestData);
     });
     updateChart();
 });
@@ -120,6 +133,9 @@ sensorDataRef.once('value', function (snapshot) {
 function convertToChartData(snapshot) {
     var itemVal = snapshot.val();
     // console.log(itemVal);
+    if (!itemVal || isNaN(itemVal.timestamp) || itemVal.timestamp <= 0 || itemVal.timestamp == "")
+        return null;
+
     return {
         timestamp: new Date(itemVal.timestamp),
         value: itemVal.value
