@@ -1,8 +1,31 @@
-const TANK_EMPTY = 70;
-const TANK_FULL = 10;
+const TANK_EMPTY = 100;
+const TANK_FULL = 0;
 
 var sensorData = [];
 var latestData = {};
+
+Chart.plugins.register({
+	afterDraw: function(chart) {
+		if (chart.data.datasets[0].data.length === 0) {
+			// No data is present
+			var ctx = chart.chart.ctx;
+			var width = chart.chart.width;
+			var height = chart.chart.height;
+			chart.clear();
+
+			ctx.save();
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.font = "16px normal 'Helvetica Nueue'";
+			// chart.options.title.text <=== gets title from chart 
+			// width / 2 <=== centers title on canvas 
+			// 18 <=== aligns text 18 pixels from top, just like Chart.js 
+			ctx.fillText(chart.options.title.text, width / 2, 18); // <====   ADDS TITLE
+			ctx.fillText('No data to display. Fetching data...', width / 2, height / 2);
+			ctx.restore();
+		}
+	}
+});
 
 var tank = document.getElementById('tankChart').getContext('2d');
 var tankChart = new Chart(tank, {
@@ -110,12 +133,13 @@ var initFetch = false;
 //     });
 // });
 
-var sensorDataRef = database.ref('sensor-data').orderByChild('timestamp').limitToLast(500);
+var sensorDataRef = database.ref('sensor-data').orderByChild('timestamp').limitToLast(1000);
 sensorDataRef.on('child_changed', function (snap) {
     if (!initFetch) return;
-    latestData = convertToChartData(snap);
-    if (latestData != null) {
-        sensorData.push(latestData);
+    var val = convertToChartData(snap);
+    if (val != null) {
+        sensorData.push(val);
+        latestData = val;
         updateChart();
     }
 });
@@ -123,11 +147,14 @@ sensorDataRef.once('value', function (snapshot) {
     initFetch = true;
     sensorData = [];
     snapshot.forEach(function (item) {
-        latestData = convertToChartData(item);
-        if (latestData != null)
-            sensorData.push(latestData);
+        var val = convertToChartData(item);
+        if (val != null)
+            sensorData.push(val);
     });
-    updateChart();
+    if (sensorData.length > 0) {
+        latestData = sensorData[sensorData.length - 1];
+        updateChart();
+    }
 });
 
 function convertToChartData(snapshot) {
@@ -138,6 +165,10 @@ function convertToChartData(snapshot) {
 
     return {
         timestamp: new Date(itemVal.timestamp),
-        value: itemVal.value
+        value: map(itemVal.value, 4, 65, 0, 100)
     };
+}
+
+function map(x, in_min, in_max, out_min, out_max) {
+    return (x - in_min) * (out_max - out_min) / (in_max - in_min) + out_min;
 }
