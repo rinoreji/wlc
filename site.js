@@ -2,29 +2,30 @@ const TANK_EMPTY = 100;
 const TANK_FULL = 0;
 
 var sensorData = [];
+var em_sensorData = [];
 var latestData = {};
 
 Chart.plugins.register({
-	afterDraw: function(chart) {
-		if (chart.data.datasets[0].data.length === 0) {
-			// No data is present
-			var ctx = chart.chart.ctx;
-			var width = chart.chart.width;
-			var height = chart.chart.height;
-			chart.clear();
+    afterDraw: function (chart) {
+        if (chart.data.datasets[0].data.length === 0) {
+            // No data is present
+            var ctx = chart.chart.ctx;
+            var width = chart.chart.width;
+            var height = chart.chart.height;
+            chart.clear();
 
-			ctx.save();
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'middle';
-			ctx.font = "16px normal 'Helvetica Nueue'";
-			// chart.options.title.text <=== gets title from chart 
-			// width / 2 <=== centers title on canvas 
-			// 18 <=== aligns text 18 pixels from top, just like Chart.js 
-			ctx.fillText(chart.options.title.text, width / 2, 18); // <====   ADDS TITLE
-			ctx.fillText('No data to display. Fetching data...', width / 2, height / 2);
-			ctx.restore();
-		}
-	}
+            ctx.save();
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.font = "16px normal 'Helvetica Nueue'";
+            // chart.options.title.text <=== gets title from chart 
+            // width / 2 <=== centers title on canvas 
+            // 18 <=== aligns text 18 pixels from top, just like Chart.js 
+            ctx.fillText(chart.options.title.text, width / 2, 18); // <====   ADDS TITLE
+            ctx.fillText('No data to display. Fetching data...', width / 2, height / 2);
+            ctx.restore();
+        }
+    }
 });
 
 var tank = document.getElementById('tankChart').getContext('2d');
@@ -100,7 +101,35 @@ var chart = new Chart(ctx, {
     }
 });
 
+var ele = document.getElementById('eleChart').getContext('2d');
+var eleChart = new Chart(ele, {
+    // The type of chart we want to create
+    type: 'line',
+    // The data for our dataset
+    data: {
+        labels: [],
+        datasets: [{
+            label: 'Electricity usage',
+            // backgroundColor: 'rgb(179, 217, 255)',
+            borderColor: 'rgb(125, 249, 255)',
+            data: [],
+            fill:false
+        }]
+    },
 
+    options: {
+        scales: {
+            xAxes: [{
+                type: 'time'
+            }]
+        },
+        elements: {
+            point: {
+                radius: 0
+            }
+        }
+    }
+});
 
 function updateChart() {
 
@@ -111,6 +140,10 @@ function updateChart() {
     tankChart.data.labels = ['Water level as of: ' + new Date(latestData.timestamp).toLocaleTimeString()];
     tankChart.data.datasets[0].data = [TANK_EMPTY - latestData.value];
     tankChart.update();
+
+    eleChart.data.labels = $.map(em_sensorData, function (n, i) { return n.timestamp });
+    eleChart.data.datasets[0].data = $.map(em_sensorData, function (n, i) { return n.value });
+    eleChart.update();
 }
 
 var firebaseConfig = {
@@ -123,15 +156,7 @@ var firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 var database = firebase.database();
 var initFetch = false;
-
-// window.db = database;
-// var test = database.ref('sensor-data').orderByChild('timestamp').startAt(1599136200000).endAt(1599138000000);
-// test.once('value', function (snapshot) {
-//     snapshot.forEach(function (item) {
-// console.log(item.key, item.val());
-// // database.ref('sensor-data/'+item.key).remove();
-//     });
-// });
+var em_initFetch = false;
 
 var sensorDataRef = database.ref('sensor-data').orderByChild('timestamp').limitToLast(1000);
 sensorDataRef.on('child_changed', function (snap) {
@@ -157,6 +182,29 @@ sensorDataRef.once('value', function (snapshot) {
     }
 });
 
+var em_sensorDataRef = database.ref('sensor-data/EM').orderByChild('timestamp').limitToLast(1000);
+em_sensorDataRef.on('child_changed', function (snap) {
+    if (!em_initFetch) return;
+    var val = convertToEMChartData(snap);
+    if (val != null) {
+        em_sensorData.push(val);
+        updateChart();
+    }
+});
+em_sensorDataRef.once('value', function (snapshot) {
+    console.log('va ', snapshot);
+    em_initFetch = true;
+    em_sensorData = [];
+    snapshot.forEach(function (item) {
+        var val = convertToEMChartData(item);
+        if (val != null)
+            em_sensorData.push(val);
+    });
+    if (em_sensorData.length > 0) {
+        updateChart();
+    }
+});
+
 function convertToChartData(snapshot) {
     var itemVal = snapshot.val();
     // console.log(itemVal);
@@ -166,6 +214,18 @@ function convertToChartData(snapshot) {
     return {
         timestamp: new Date(itemVal.timestamp),
         value: map(itemVal.value, 4, 65, 0, 100)
+    };
+}
+
+function convertToEMChartData(snapshot) {
+    var itemVal = snapshot.val();
+    // console.log(itemVal);
+    if (!itemVal || isNaN(itemVal.timestamp) || itemVal.timestamp <= 0 || itemVal.timestamp == "")
+        return null;
+
+    return {
+        timestamp: new Date(itemVal.timestamp),
+        value: itemVal.P
     };
 }
 
